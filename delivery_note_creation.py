@@ -3,21 +3,24 @@
 '''
 Title:		Delivery Note Creation
 Author:		Rob Phoenix (rob.phoenix@bt.com)
-Usage: 		Creates multiple excel workbooks, each one a delivery note 
-			based on each worksheet in a main inventory database excel 
-			workbook.  Copies over store name, address & code; lists the 
-			serial numbers of every device shipping to each store, grouped 
-			by model name; and lists the quantities of each model and the 
+Usage: 		Creates multiple excel workbooks, each one a delivery note
+			based on each worksheet in a main inventory database excel
+			workbook.  Copies over store name, address & code; lists the
+			serial numbers of every device shipping to each store, grouped
+			by model name; and lists the quantities of each model and the
 			total number of boxes shipping.
 Platform:	Windows
 Warning:	Only works with .xls files, NOT with .xlsx files
-Date: 		23/12/2014
-Version: 	2.2
-''' 
+Date: 		08/01/2015
+Version: 	2.3
+'''
 
 import re
 import csv
 import os
+import time
+import glob
+import shutil
 import xlrd
 import xlwt
 from xlwt import Workbook, easyxf
@@ -25,27 +28,28 @@ from xlrd import open_workbook,XL_CELL_TEXT
 import win32gui
 from win32com.shell import shell, shellcon
 
-#Define a 'visual demarcation' line
-vis_demarc_line = '\n\n' + ('=' * 100)
+#Define a 'visual demarcation' line & desktop path
+vis_demarc_line = '\n\n' + ('=' * 80)
+desktop_path = 'C:\Users\localadmin\Desktop\\'
 
 #Define output workbook styles
 common_style = (
 	'font: name Calibri, bold off, height 220;'
 	'borders: left medium, right medium'
 	)
-all_borders_right_align = xlwt.easyxf(common_style + 
+all_borders_right_align = xlwt.easyxf(common_style +
 	', top medium, bottom medium;'
 	'alignment: horizontal right, vertical centre;'
 	)
-all_borders_left_align = xlwt.easyxf(common_style + 
+all_borders_left_align = xlwt.easyxf(common_style +
 	', top medium, bottom medium;'
 	'alignment: horizontal left, vertical centre;'
 	)
-all_borders_centre_align = xlwt.easyxf(common_style + 
+all_borders_centre_align = xlwt.easyxf(common_style +
 	', top medium, bottom medium;'
 	'alignment: horizontal centre, vertical centre;'
 	)
-left_and_right_border_left_align = xlwt.easyxf(common_style + 
+left_and_right_border_left_align = xlwt.easyxf(common_style +
 	';''alignment: horizontal left, vertical centre;'
 	)
 delivery_note_title = xlwt.easyxf(
@@ -53,9 +57,9 @@ delivery_note_title = xlwt.easyxf(
 	'alignment: horizontal centre, vertical centre;'
 	)
 
-def format_delivery_note(deliverynote):	
+def format_delivery_note(deliverynote):
 	#Insert IT Services image
-	deliverynote.insert_bitmap('ITSERVICES.bmp', 0, 1)
+	deliverynote.insert_bitmap('C:\Users\Public\Pictures\Sample Pictures\ITSERVICES.bmp', 0, 1)
 	#Create text & fields (row1,row2,col1,col2)
 	deliverynote.write_merge(7,7,2,6,"DELIVERY NOTE",
 		delivery_note_title)
@@ -89,9 +93,13 @@ def format_delivery_note(deliverynote):
 		all_borders_centre_align)
 
 def main():
-	#open browser window to enable user to choose file to create delivery 
+	#delete any leftover previously created delivery notes folders
+	leftover_del_notes_folders = glob.glob('\Delivery Notes*')
+	for folder in leftover_del_notes_folders:
+		shutil.rmtree(folder)
+	#open browser window to enable user to choose file to create delivery
 	#notes from
-	desktop_pidl = shell.SHGetFolderLocation (0, shellcon.CSIDL_DESKTOP, 
+	desktop_pidl = shell.SHGetFolderLocation (0, shellcon.CSIDL_DESKTOP,
 		0, 0)
 	pidl, display_name, image_list = shell.SHBrowseForFolder (
 	  win32gui.GetDesktopWindow (),
@@ -125,7 +133,7 @@ like to create your delivery notes from.",
 		for address_line in store_address:
 			address_dict[i] = address_line
 			i += 1
-		#Define devices in each worksheet, where all_devices is a 
+		#Define devices in each worksheet, where all_devices is a
 		#list of devices
 		switch_col = worksheet.col_values(4,6,15)
 		ap_col = worksheet.col_values(1,17,36)
@@ -145,7 +153,7 @@ like to create your delivery notes from.",
 		if len(all_devices) > 3:
 			device3 = all_devices[2]
 		device4 = all_devices[-1]
-		#Create empty device lists, where the name of each list is a 
+		#Create empty device lists, where the name of each list is a
 		#different device model
 		device1_list = []
 		device2_list = []
@@ -202,7 +210,7 @@ like to create your delivery notes from.",
 		j = i + len(device1_list)
 		k = j + len(device2_list)
 		l = k + len(device3_list)
-		total_no_of_devices = (len(device1_list) + len(device2_list) + 
+		total_no_of_devices = (len(device1_list) + len(device2_list) +
 			len(device3_list) + len(device4_list)
 			)
 		#write device model names to delivery note
@@ -240,18 +248,19 @@ like to create your delivery notes from.",
 			total_boxes,all_borders_centre_align)
 		#Delete temp csv files
 		os.remove(store + '-temp.csv')
-		#create 'Delivery Notes' folder within the same directory as the 
+		#create 'Delivery Notes' folder within the same directory as the
 		#Excel spreadsheet if it doesn't already exist
-		del_notes_dir = os.path.dirname(fin) + '\Delivery Notes\\'
+		folder_timestr = time.strftime("%d%m%Y")
+		del_notes_dir = desktop_path + '\Delivery Notes-' + folder_timestr + '\\'
 		if not os.path.exists(del_notes_dir):
 			os.makedirs(del_notes_dir)
 		#Save excel file
-		workbook_out.save(del_notes_dir + store_code.value + '-' 
+		workbook_out.save(del_notes_dir + store_code.value + '-'
 			+ total_boxes + '.xls'
 			)
 	print (
-		vis_demarc_line + 
-		"\n\n\tYour delivery notes have been created here:\n\n\t%s" 
+		vis_demarc_line +
+		"\n\n\tYour delivery notes have been created here:\n\n\t%s"
 		% del_notes_dir + vis_demarc_line + '\n\n'
 		)
 
